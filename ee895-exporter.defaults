@@ -1,0 +1,1 @@
+ARGS="--config.file=/etc/prometheus/ee895-exporter.yaml"

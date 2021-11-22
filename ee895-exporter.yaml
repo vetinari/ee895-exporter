@@ -1,0 +1,8 @@
+listen:
+    address: ":9871"
+    metrics_path: /metrics
+collector:
+    log_level: debug
+    labels:
+        location: "Berlin, DE"
+        name: "Basement"

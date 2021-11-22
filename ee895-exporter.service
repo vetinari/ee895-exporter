@@ -1,0 +1,17 @@
+[Unit]
+Description=Prometheus exporter for EE895 Sensor
+Documentation=https://github.com/vetinari/ee895-exporter
+
+[Service]
+Restart=always
+User=i2c-exporter
+Group=i2c
+EnvironmentFile=/etc/default/ee895-exporter
+ExecStart=/usr/local/sbin/ee895-exporter $ARGS
+TimeoutStopSec=20s
+SendSIGKILL=yes
+
+[Install]
+WantedBy=multi-user.target
+
+

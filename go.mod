@@ -1,4 +1,4 @@
-module github.com/vetinari/i2c-exporter
+module github.com/vetinari/ee895-exporter
 
 go 1.14
 

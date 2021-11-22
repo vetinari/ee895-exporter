@@ -24,9 +24,8 @@ type ListenConfig struct {
 }
 
 type CollectorConfig struct {
-	LogLevel     string                                  `yaml:"log_level"`
-	Labels       map[string]string                       `yaml:"labels"`
-	SensorLabels map[string]map[string]map[string]string `yaml:"sensor_labels"`
+	LogLevel string            `yaml:"log_level"`
+	Labels   map[string]string `yaml:"labels"`
 }
 
 func parseConfig() (*LocalConfig, error) {

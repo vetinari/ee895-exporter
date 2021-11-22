@@ -30,7 +30,7 @@ func main() {
 	log.SetLevel(lvl)
 
 	ch := make(chan EE895Data)
-	c := &Collector{Channel: ch}
+	c := &Collector{Channel: ch, Labels: config.Collector.Labels}
 	go c.Run()
 
 	prometheus.MustRegister(c)
@@ -60,6 +60,7 @@ type Collector struct {
 	Channel chan EE895Data
 	Bus     *i2c.I2C
 	Data    EE895Data
+	Labels  map[string]string
 }
 
 func (c *Collector) Run() {
@@ -112,12 +113,11 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	c.Lock()
 	defer c.Unlock()
 
-	labels := map[string]string{}
 	desc := prometheus.NewDesc(
 		"i2c_co2_value",
 		"CO2 Level in ppm",
 		nil,
-		labels,
+		c.Labels,
 	)
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(c.Data.CO2))
 
@@ -125,7 +125,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		"i2c_temperature_value",
 		"Temperature in °C",
 		nil,
-		labels,
+		c.Labels,
 	)
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, c.Data.Temperature)
 
@@ -133,7 +133,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		"i2c_pressure_value",
 		"Air Pressure in hPa",
 		nil,
-		labels,
+		c.Labels,
 	)
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, c.Data.Pressure)
 }

@@ -16,6 +16,7 @@ const (
 type LocalConfig struct {
 	Listen    ListenConfig    `yaml:"listen"`
 	Collector CollectorConfig `yaml:"collector"`
+	MQTT      MQTT            `yaml:"mqtt"`
 }
 
 type ListenConfig struct {
@@ -24,8 +25,9 @@ type ListenConfig struct {
 }
 
 type CollectorConfig struct {
-	LogLevel string            `yaml:"log_level"`
-	Labels   map[string]string `yaml:"labels"`
+	LogLevel  string            `yaml:"log_level"`
+	LogFormat string            `yaml:"log_format"`
+	Labels    map[string]string `yaml:"labels"`
 }
 
 func parseConfig() (*LocalConfig, error) {
@@ -56,7 +58,11 @@ func defaultConfig() (*LocalConfig, error) {
 			MetricsPath: defaultMetricsPath,
 		},
 		Collector: CollectorConfig{
-			LogLevel: "info",
+			LogLevel:  "info",
+			LogFormat: "text",
+		},
+		MQTT: MQTT{
+			Enabled: false,
 		},
 	}, nil
 }

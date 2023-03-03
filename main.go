@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -13,6 +16,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
+
+var i2cBus = 1
+var i2cAddr i2cAddress = 0x5E
+var hostname string
+
+type i2cAddress uint8
+
+func (i i2cAddress) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"0x%02X\"", i)), nil
+}
 
 func main() {
 	config, err := parseConfig()
@@ -28,9 +41,36 @@ func main() {
 		lvl = log.InfoLevel
 	}
 	log.SetLevel(lvl)
+	if config.Collector.LogFormat == "" {
+		config.Collector.LogFormat = "text"
+	}
+	switch config.Collector.LogFormat {
+	case "text":
+		log.SetFormatter(new(log.TextFormatter))
+	case "json":
+		log.SetFormatter(new(log.JSONFormatter))
+	default:
+		log.Errorf("unknown formatter `%s`, using `text` as fallback", config.Collector.LogFormat)
+		log.SetFormatter(new(log.TextFormatter))
+	}
+
+	hostname, err = os.Hostname()
+	if err != nil {
+		log.Errorf("failed to get hostname, setting to unknown: %s", err)
+		hostname = "unknown"
+	}
+
+	var mqClient *Client
+	if config.MQTT.Enabled {
+		mqClient, err = NewClient(config.MQTT.Broker)
+		if err != nil {
+			log.Errorf("failed to get MQTT client: %s", err)
+		}
+		config.MQTT.Client = mqClient
+	}
 
 	ch := make(chan EE895Data)
-	c := &Collector{Channel: ch, Labels: config.Collector.Labels}
+	c := &Collector{Channel: ch, Labels: config.Collector.Labels, MQTT: config.MQTT, Topic: Topic(config.MQTT.Topic)}
 	go c.Run()
 
 	prometheus.MustRegister(c)
@@ -50,9 +90,18 @@ func main() {
 }
 
 type EE895Data struct {
-	CO2         uint16
-	Temperature float64
-	Pressure    float64
+	CO2         uint16  `json:"co2"`
+	Temperature float64 `json:"temperature"`
+	Pressure    float64 `json:"pressure"`
+}
+
+type MQTTData struct {
+	CO2         uint16     `json:"co2"`
+	Temperature float64    `json:"temperature"`
+	Pressure    float64    `json:"pressure"`
+	Hostname    string     `json:"hostname"`
+	I2CBus      int        `json:"i2c_bus"`
+	I2CAddr     i2cAddress `json:"i2c_address"`
 }
 
 type Collector struct {
@@ -61,10 +110,12 @@ type Collector struct {
 	Bus     *i2c.I2C
 	Data    EE895Data
 	Labels  map[string]string
+	MQTT    MQTT
+	Topic   Topic
 }
 
 func (c *Collector) Run() {
-	bus, err := i2c.NewI2C(0x5E, 1)
+	bus, err := i2c.NewI2C(uint8(i2cAddr), i2cBus)
 	if err != nil {
 		log.Fatalf("failed to open I2C Bus: %s", err)
 	}
@@ -93,14 +144,38 @@ func (c *Collector) Run() {
 		co2 := binary.BigEndian.Uint16([]byte{data[0], data[1]})
 		temp := float64(binary.BigEndian.Uint16([]byte{data[2], data[3]})) / 100.0
 		pressure := float64(binary.BigEndian.Uint16([]byte{data[6], data[7]})) / 10.0
+
 		log.Debugf("CO2: %d ppm | Temperature: %.2f °C | Pressure: %.1f hPa\n", co2, temp, pressure)
+
 		c.Channel <- EE895Data{
 			CO2:         co2,
 			Temperature: temp,
 			Pressure:    pressure,
 		}
+
+		if c.MQTT.Enabled {
+			mqd := &MQTTData{
+				CO2:         co2,
+				Temperature: temp,
+				Pressure:    pressure,
+				Hostname:    hostname,
+				I2CBus:      i2cBus,
+				I2CAddr:     i2cAddr,
+			}
+			go c.Publish(mqd)
+		}
 		time.Sleep(15 * time.Second)
 	}
+}
+
+// Publish publishes to the MQTT broker.
+func (c *Collector) Publish(data *MQTTData) {
+	enc, err := json.Marshal(data)
+	if err != nil {
+		log.Errorf("failed to marshal json: %s", err)
+		return
+	}
+	c.MQTT.Client.Publish(string(c.Topic), enc)
 }
 
 // Describe is part of the prometheus.Collector interface

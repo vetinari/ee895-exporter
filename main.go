@@ -96,12 +96,13 @@ type EE895Data struct {
 }
 
 type MQTTData struct {
-	CO2         uint16     `json:"co2"`
-	Temperature float64    `json:"temperature"`
-	Pressure    float64    `json:"pressure"`
-	Hostname    string     `json:"hostname"`
-	I2CBus      int        `json:"i2c_bus"`
-	I2CAddr     i2cAddress `json:"i2c_address"`
+	CO2         uint16            `json:"co2"`
+	Temperature float64           `json:"temperature"`
+	Pressure    float64           `json:"pressure"`
+	Hostname    string            `json:"hostname"`
+	I2CBus      int               `json:"i2c_bus"`
+	I2CAddr     i2cAddress        `json:"i2c_address"`
+	Labels      map[string]string `json:"labels"`
 }
 
 type Collector struct {
@@ -161,6 +162,7 @@ func (c *Collector) Run() {
 				Hostname:    hostname,
 				I2CBus:      i2cBus,
 				I2CAddr:     i2cAddr,
+				Labels:      c.Labels,
 			}
 			go c.Publish(mqd)
 		}

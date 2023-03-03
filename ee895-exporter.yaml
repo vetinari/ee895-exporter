@@ -3,6 +3,16 @@ listen:
     metrics_path: /metrics
 collector:
     log_level: debug
+    log_format: "json"
     labels:
         location: "Berlin, DE"
         name: "Basement"
+mqtt:
+    enabled: true
+    broker:
+        host: 192.168.67.3
+        port: 1883
+        username: ee895
+        password: ee895_pass
+        client_id: ee895-exporter
+    topic: i2c/ee895

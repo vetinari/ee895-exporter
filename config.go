@@ -63,6 +63,10 @@ func defaultConfig() (*LocalConfig, error) {
 		},
 		MQTT: MQTT{
 			Enabled: false,
+			HomeAssistant: HomeAssistant{
+				Enabled:        false,
+				DiscoveryTopic: "homeassistant/",
+			},
 		},
 	}, nil
 }

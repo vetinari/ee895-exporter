@@ -69,6 +69,10 @@ func main() {
 		config.MQTT.Client = mqClient
 	}
 
+	if config.MQTT.HomeAssistant.Enabled {
+		sendHAConfig(config)
+	}
+
 	ch := make(chan EE895Data)
 	c := &Collector{Channel: ch, Labels: config.Collector.Labels, MQTT: config.MQTT, Topic: Topic(config.MQTT.Topic)}
 	go c.Run()
@@ -213,4 +217,41 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		c.Labels,
 	)
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, c.Data.Pressure)
+}
+
+func sendHAConfig(cfg *LocalConfig) {
+	for _, sensor := range []struct {
+		class string
+		name  string
+		unit  string
+	}{
+		{"carbon_dioxide", "co2", "ppm"},
+		{"temperature", "temperature", "°C"},
+		{"atmospheric_pressure", "pressure", "hPa"},
+	} {
+		dev := map[string]interface{}{
+			"device_class":        sensor.class,
+			"unique_id":           "i2c_exporter_" + hostname + "_" + sensor.name,
+			"object_id":           "i2c_exporter_" + hostname + "_" + sensor.name,
+			"name":                "i2c_exporter_" + hostname + "_" + sensor.name,
+			"state_topic":         string(cfg.MQTT.Topic),
+			"unit_of_measurement": sensor.unit,
+			"value_template":      fmt.Sprintf("{{ value_json.%s }}", sensor.name),
+			"device": map[string]interface{}{
+				"name": "I2C Exporter / " + hostname,
+				"identifiers": []string{
+					"ic2_exporter_" + hostname,
+				},
+			},
+			"origin": map[string]string{
+				"name": "I2C Exporter",
+			},
+		}
+		enc, err := json.Marshal(dev)
+		if err != nil {
+			log.Warnf("failed to marshal HA config: %s", err)
+			continue
+		}
+		cfg.MQTT.Client.Publish(cfg.MQTT.HomeAssistant.DiscoveryTopic.Name("sensor/i2c_exporter_"+sensor.name+"/config"), enc)
+	}
 }
